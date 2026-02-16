@@ -26,14 +26,23 @@ class PatentAnalysisState(BaseModel):
     """
     Complete state for LangGraph workflow.
     """
-    document_path: str = ""
-    document_info: Optional[DocumentInfo] = None
-    extracted_text: str = ""
+    # File paths
+    description_path: str = ""
+    claims_path: str = ""
+    drawings_path: str = ""
     
-    # Analysis results (to be expanded)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    # Extracted texts
+    description_text: str = ""
+    claims_text: str = ""
+    drawings_text: str = ""
+    
+    # Document info (multiple now)
+    description_info: Optional[DocumentInfo] = None
+    claims_info: Optional[DocumentInfo] = None
+    drawings_info: Optional[DocumentInfo] = None
+
     errors: List[str] = Field(default_factory=list)
     
     # Workflow control
-    current_agent: str = "document_reader"
+    current_agent: str = "description_reader"
     processing_complete: bool = False

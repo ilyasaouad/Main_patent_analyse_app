@@ -9,35 +9,64 @@ from loguru import logger
 
 from config import PatentAnalysisState, settings
 from agents import (
-    DocumentReaderAgent,
+    DescriptionReaderSubAgent,
+    ClaimsReaderSubAgent,
+    DrawingReaderSubAgent,
     ClaimsAnalystAgent,
-    PriorArtSearchAgent,
-    NoveltyAgent,
-    InventiveStepAgent,
-    IndustrialApplicabilityAgent,
-    InfringementAgent,
-    ReportGeneratorAgent
+    # ... other agents
 )
 
 def create_patent_workflow():
     """
-    Initializes the LangGraph workflow with all 8 agents.
+    Initializes the LangGraph workflow with separate readers for description, claims, and drawings.
     """
     workflow = StateGraph(PatentAnalysisState)
 
     # 1. Initialize Agents
-    doc_reader = DocumentReaderAgent()
-    # claims_analyst = ClaimsAnalystAgent()
-    # ... other agents on hold
+    description_reader = DescriptionReaderSubAgent()
+    claims_reader = ClaimsReaderSubAgent()
+    drawing_reader = DrawingReaderSubAgent()
 
     # 2. Add Nodes
-    workflow.add_node("document_reader", lambda state: {"extracted_text": doc_reader.run(state.document_path)[0]})
-    # workflow.add_node("claims_analyst", claims_analyst.run)
-    # ... other nodes on hold
+    def run_description(state):
+        path = state.description_path if hasattr(state, "description_path") else state.get("description_path")
+        text, _ = description_reader.run(path)
+        return {
+            "description_text": text,
+            "current_agent": "claims_reader"
+        }
+
+    def run_claims(state):
+        path = state.claims_path if hasattr(state, "claims_path") else state.get("claims_path")
+        if path:
+            text, _ = claims_reader.run(path)
+        else:
+            text = "Not provided."
+        return {
+            "claims_text": text,
+            "current_agent": "drawing_reader"
+        }
+
+    def run_drawing(state):
+        path = state.drawings_path if hasattr(state, "drawings_path") else state.get("drawings_path")
+        if path:
+            text, _ = drawing_reader.run(path)
+        else:
+            text = "Not provided."
+        return {
+            "drawings_text": text,
+            "current_agent": "END"
+        }
+
+    workflow.add_node("description_reader", run_description)
+    workflow.add_node("claims_reader", run_claims)
+    workflow.add_node("drawing_reader", run_drawing)
 
     # 3. Define Edges
-    workflow.set_entry_point("document_reader")
-    workflow.add_edge("document_reader", END)
+    workflow.set_entry_point("description_reader")
+    workflow.add_edge("description_reader", "claims_reader")
+    workflow.add_edge("claims_reader", "drawing_reader")
+    workflow.add_edge("drawing_reader", END)
 
     return workflow.compile()
 

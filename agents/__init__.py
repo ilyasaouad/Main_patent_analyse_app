@@ -1,4 +1,4 @@
-from .document_reader_agent.agent import DocumentReaderAgent
+from .document_reader_agent import DescriptionReaderSubAgent, DrawingReaderSubAgent, ClaimsReaderSubAgent
 
 class ClaimsAnalystAgent:
     def run(self, state):

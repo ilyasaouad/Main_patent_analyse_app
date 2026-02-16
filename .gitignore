@@ -166,3 +166,15 @@ temp/
 config.py
 test_output.log
 test_result*.log
+describtion_text.txt
+drawings_text.txt
+claims_text.txt
+# Ignore results in root
+/*.txt
+!/requirements.txt
+!/README.md
+
+# Ignore local library clones
+agents/**/mineru/
+agents/**/demo/
+**/__pycache__/
