@@ -16,6 +16,7 @@ from agents import (
     # ... other agents
 )
 
+
 def create_patent_workflow():
     """
     Initializes the LangGraph workflow with separate readers for description, claims, and drawings.
@@ -29,34 +30,41 @@ def create_patent_workflow():
 
     # 2. Add Nodes
     def run_description(state):
-        path = state.description_path if hasattr(state, "description_path") else state.get("description_path")
-        text, _ = description_reader.run(path)
+        path = (
+            state.description_path
+            if hasattr(state, "description_path")
+            else state.get("description_path")
+        )
+        text, _, abstract_text = description_reader.run(path)
         return {
             "description_text": text,
-            "current_agent": "claims_reader"
+            "abstract_text": abstract_text,
+            "current_agent": "claims_reader",
         }
 
     def run_claims(state):
-        path = state.claims_path if hasattr(state, "claims_path") else state.get("claims_path")
+        path = (
+            state.claims_path
+            if hasattr(state, "claims_path")
+            else state.get("claims_path")
+        )
         if path:
             text, _ = claims_reader.run(path)
         else:
             text = "Not provided."
-        return {
-            "claims_text": text,
-            "current_agent": "drawing_reader"
-        }
+        return {"claims_text": text, "current_agent": "drawing_reader"}
 
     def run_drawing(state):
-        path = state.drawings_path if hasattr(state, "drawings_path") else state.get("drawings_path")
+        path = (
+            state.drawings_path
+            if hasattr(state, "drawings_path")
+            else state.get("drawings_path")
+        )
         if path:
             text, _ = drawing_reader.run(path)
         else:
             text = "Not provided."
-        return {
-            "drawings_text": text,
-            "current_agent": "END"
-        }
+        return {"drawings_text": text, "current_agent": "END"}
 
     workflow.add_node("description_reader", run_description)
     workflow.add_node("claims_reader", run_claims)
@@ -69,6 +77,7 @@ def create_patent_workflow():
     workflow.add_edge("drawing_reader", END)
 
     return workflow.compile()
+
 
 # Singleton instance of the compiled graph
 patent_analyzer = create_patent_workflow()
