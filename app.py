@@ -71,80 +71,9 @@ if 'history' not in st.session_state:
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Patent Shield")
-    st.markdown("Advanced Patent Analysis Engine")
+    st.markdown("Advanced Technical Diagnostics")
     st.markdown("---")
     
-    st.subheader("📤 Upload Documents")
-    desc_file = st.file_uploader("Description (PDF/DOCX/IMG) *", type=["pdf", "docx", "png", "jpg", "jpeg"])
-    claims_file = st.file_uploader("Claims (PDF/DOCX/IMG)", type=["pdf", "docx", "png", "jpg", "jpeg"])
-    drawings_file = st.file_uploader("Drawings (PDF/DOCX/IMG)", type=["pdf", "docx", "png", "jpg", "jpeg"])
-    
-    if desc_file:
-        if st.button("🚀 Run Full Analysis", type="primary"):
-            def save_tmp(uploaded):
-                if not uploaded:
-                    return ""
-                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded.name).suffix) as tmp:
-                    tmp.write(uploaded.getvalue())
-                    return tmp.name
-
-            # 1. Initialize State
-            st.session_state.state = PatentAnalysisState(
-                description_path=save_tmp(desc_file),
-                claims_path=save_tmp(claims_file),
-                drawings_path=save_tmp(drawings_file),
-                description_info=DocumentInfo(
-                    filename=desc_file.name,
-                    file_size=desc_file.size,
-                    file_path=desc_file.name
-                ),
-                claims_info=DocumentInfo(
-                    filename=claims_file.name,
-                    file_size=claims_file.size,
-                    file_path=claims_file.name
-                ) if claims_file else None,
-                drawings_info=DocumentInfo(
-                    filename=drawings_file.name,
-                    file_size=drawings_file.size,
-                    file_path=drawings_file.name
-                ) if drawings_file else None
-            )
-            st.session_state.history = []
-            
-            # 2. Automated Loop
-            with st.status("🛠️ Running Patent Analysis Suite...", expanded=True) as status:
-                agent_sequence = ["description_reader", "claims_reader", "drawing_reader"]
-                for agent_name in agent_sequence:
-                    status.update(label=f"🔄 Agent {agent_name.replace('_', ' ').title()} is working...")
-                    try:
-                        inputs = st.session_state.state.model_dump()
-                        result = st.session_state.workflow.invoke(inputs)
-                        
-                        if isinstance(result, dict):
-                            st.session_state.state = PatentAnalysisState(**result)
-                        else:
-                            st.session_state.state = result
-                        
-                        st.session_state.history.append(st.session_state.state.model_dump())
-                        
-                        # Stop if we hit the end (drawing_reader sets agent to "END" or similar)
-                        if st.session_state.state.current_agent == "END":
-                             break
-                    except Exception as e:
-                        st.error(f"❌ {agent_name} failed: {str(e)}")
-                        st.session_state.state.errors.append(str(e))
-                        break
-                
-                status.update(label="✅ Analysis Complete!", state="complete", expanded=False)
-            
-            st.rerun()
-    else:
-        st.info("💡 Description is mandatory to start analysis.")
-
-    st.markdown("---")
-    if st.session_state.state:
-        st.write("**Analysis Status:** Complete" if st.session_state.state.processing_complete or st.session_state.state.current_agent == "END" else "**Analysis Status:** In Progress")
-        
     if st.button("🗑️ Reset Application"):
         st.session_state.state = None
         st.session_state.history = []
@@ -156,131 +85,128 @@ with st.sidebar:
     
     def check_agent(name, cls):
         try:
-            agent = cls()
             available = getattr(sys.modules[cls.__module__], 'MINERU_AVAILABLE', False)
-            return "✅ Available" if available else "❌ MinerU Missing"
+            return "✅ Initialized" if available else "❌ MinerU Missing"
         except Exception as e:
             return f"⚠️ Error: {str(e)}"
 
-    st.write("**Agents Status:**")
+    st.write("**SubAgents Status:**")
     st.write(f"- Description: {check_agent('Desc', DescriptionReaderSubAgent)}")
     st.write(f"- Claims: {check_agent('Claims', ClaimsReaderSubAgent)}")
     st.write(f"- Drawings: {check_agent('Draw', DrawingReaderSubAgent)}")
     
-    if st.button("🔍 Run Model Check"):
-        cache_path = Path.home() / ".cache" / "huggingface" / "hub"
-        if cache_path.exists():
-            st.write(f"HF Cache: Found at {cache_path}")
-        else:
-            st.write("HF Cache: Not found in home directory.")
+    if st.button("🔍 Run Engine Check"):
         st.write(f"Model Source: {os.environ.get('MINERU_MODEL_SOURCE', 'default')}")
 
 # --- MAIN PAGE ---
-st.title("🛡️ Agentic Analysis Dashboard")
+st.title("🛡️ Patent Shield Analysis")
 
 if not st.session_state.state:
-    st.info("Please upload patent components in the sidebar to begin analysis.")
+    st.markdown("### 📝 1. Upload Patent Documents")
+    st.info("Upload the components of your patent below. Only the **Description** is mandatory.")
     
-    # Showcase cards
-    cols = st.columns(3)
-    with cols[0]:
-        st.markdown("""
-        <div class="status-box">
-            <h3>📑 Description Reader</h3>
-            <p>Extracts technical description using layout-aware OCR.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with cols[1]:
-        st.markdown("""
-        <div class="status-box">
-            <h3>⚖️ Claims Reader</h3>
-            <p>Isolates legal claims from the uploaded claims document.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    with cols[2]:
-        st.markdown("""
-        <div class="status-box">
-            <h3>🖼️ Drawing Reader</h3>
-            <p>Processes drawings and associated text descriptions.</p>
-        </div>
-        """, unsafe_allow_html=True)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        desc_file = st.file_uploader("📑 Description (PDF/DOCX) *", type=["pdf", "docx"])
+    with col2:
+        claims_file = st.file_uploader("⚖️ Claims (PDF/DOCX)", type=["pdf", "docx"])
+    with col3:
+        drawings_file = st.file_uploader("🖼️ Drawings (PDF)", type=["pdf"])
+
+    if desc_file:
+        st.markdown("---")
+        if st.button("🚀 Start Extraction & Analysis", type="primary", use_container_width=True):
+            def save_tmp(uploaded):
+                if not uploaded: return ""
+                with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded.name).suffix) as tmp:
+                    tmp.write(uploaded.getvalue())
+                    return tmp.name
+
+            # 1. Initialize State
+            st.session_state.state = PatentAnalysisState(
+                description_path=save_tmp(desc_file),
+                claims_path=save_tmp(claims_file),
+                drawings_path=save_tmp(drawings_file),
+                description_info=DocumentInfo(filename=desc_file.name, file_size=desc_file.size, file_path=""),
+                claims_info=DocumentInfo(filename=claims_file.name, file_size=claims_file.size, file_path="") if claims_file else None,
+                drawings_info=DocumentInfo(filename=drawings_file.name, file_size=drawings_file.size, file_path="") if drawings_file else None
+            )
+            
+            # 2. Automated Loop
+            with st.status("🔍 Extracting technical data...", expanded=True) as status:
+                try:
+                    # Convert Pydantic model to dict for LangGraph input
+                    initial_state = st.session_state.state.model_dump()
+                    
+                    # Invoke the compiled workflow check
+                    # st.session_state.workflow is the COMPILED graph (app)
+                    
+                    # We can stream the events to show progress, or just invoke
+                    # For simplicity let's just invoke the full graph
+                    status.write("Running Extraction Pipeline...")
+                    result = st.session_state.workflow.invoke(initial_state)
+                    
+                    # Update state with result
+                    status.write("Pipeline Finished. Updating State...")
+                    if isinstance(result, dict):
+                        # Merge result back into Pydantic model
+                        # Note: invoke returns the final state dict
+                        # We should be careful not to overwrite the complex objects if they are missing
+                        # But PatentAnalysisState should match the dict structure
+                        
+                        # Debug: Print keys returned
+                        print(f"[App] Workflow returned keys: {list(result.keys())}")
+                        
+                        # Re-instantiate state from result dict
+                        st.session_state.state = PatentAnalysisState(**result)
+                    
+                    status.update(label="✅ Extraction Complete!", state="complete", expanded=False)
+                    
+                except Exception as e:
+                    status.update(label="❌ Extraction Failed", state="error")
+                    st.error(f"Pipeline Error: {str(e)}")
+                    # Print full stack trace to terminal
+                    import traceback
+                    traceback.print_exc()
+
+            st.rerun()
 
 else:
-    # --- WORKFLOW PROGRESS ---
-    st.subheader("🏁 Execution Pipeline")
+    # --- RESULTS VIEW ---
+    st.success("✅ Analysis Complete! Below is the consolidated state of the Document Reader Agent.")
     
-    # Define the agents in order
-    agent_sequence = ["description_reader", "claims_reader", "drawing_reader"]
-    
-    progress_cols = st.columns(len(agent_sequence))
-    
-    for i, agent in enumerate(agent_sequence):
-        with progress_cols[i]:
-            is_active = st.session_state.state.current_agent == agent
-            is_done = agent in [h.get("current_agent") for h in st.session_state.history] or \
-                      (st.session_state.state.description_text != "" and agent == "description_reader") or \
-                      (st.session_state.state.claims_text != "" and agent == "claims_reader") or \
-                      (st.session_state.state.drawings_text != "" and agent == "drawing_reader")
-            
-            icon = "✅" if is_done else ("🔵" if is_active else "⚪")
-            color = "#28a745" if is_done else ("#007bff" if is_active else "#6c757d")
-            
-            st.markdown(f"""
-            <div style="text-align: center; border-bottom: 4px solid {color}; padding: 10px;">
-                <span style="font-size: 1.5em;">{icon}</span><br>
-                <b>{agent.replace('_', ' ').title()}</b>
-            </div>
-            """, unsafe_allow_html=True)
+    # Overview Metrics
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Description Status", "Extracted" if st.session_state.state.description_text else "Pending")
+    m2.metric("Claims Status", "Extracted" if st.session_state.state.claims_text else "Skipped")
+    m3.metric("Drawings Status", "Analyzed" if st.session_state.state.drawings_text else "Skipped")
 
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- AGENT DATA VIEW ---
-    col_content, col_meta = st.columns([2, 1])
+    st.markdown("---")
     
-    with col_content:
-        st.subheader("📝 Extracted Content")
-        tabs = st.tabs(["Description", "Claims", "Drawings"])
+    # Consolidated Content Tabs
+    tab_d, tab_c, tab_dr = st.tabs(["📑 Description Text", "⚖️ Claims Text", "📊 Drawings Metadata & Text"])
+    
+    with tab_d:
+        st.text_area("Final state: description_text", value=st.session_state.state.description_text, height=600)
         
-        with tabs[0]:
-            if st.session_state.state.description_text:
-                st.text_area("Extracted Description", value=st.session_state.state.description_text, height=500)
-            else:
-                st.info("Description pending extraction.")
-                
-        with tabs[1]:
-            if st.session_state.state.claims_text:
-                st.text_area("Extracted Claims", value=st.session_state.state.claims_text, height=500)
-            else:
-                st.info("Claims pending extraction.")
+    with tab_c:
+        if st.session_state.state.claims_text:
+            st.text_area("Final state: claims_text", value=st.session_state.state.claims_text, height=600)
+        else:
+            st.warning("No claims document was provided for extraction.")
 
-        with tabs[2]:
-            if st.session_state.state.drawings_text:
-                st.text_area("Extracted Drawings Content", value=st.session_state.state.drawings_text, height=500)
-            else:
-                st.info("Drawings pending extraction.")
+    with tab_dr:
+        if st.session_state.state.drawings_text:
+            st.text_area("Final state: drawings_text", value=st.session_state.state.drawings_text, height=600)
+        else:
+            st.warning("No drawings document was provided for extraction.")
 
-    with col_meta:
-        st.subheader("📊 Document Metadata")
-        
-        def show_doc_card(title, info):
-            if info:
-                st.markdown('<div class="status-box">', unsafe_allow_html=True)
-                st.write(f"**📄 {title}**")
-                st.markdown(f"""
-                <div class="metadata-card">
-                Filename: {info.filename}<br>
-                Size: {info.file_size / 1024:.1f} KB
-                </div>
-                """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+    # Metadata summary
+    with st.expander("🛠️ View Raw State Metadata"):
+        st.json(st.session_state.state.model_dump())
 
-        show_doc_card("Description", st.session_state.state.description_info)
-        show_doc_card("Claims", st.session_state.state.claims_info)
-        show_doc_card("Drawings", st.session_state.state.drawings_info)
-        
-        # Errors
-        if st.session_state.state.errors:
-            st.error(" / ".join(st.session_state.state.errors))
+st.markdown("---")
+st.caption("Patent Shield v1.2 | Multi-SubAgent Technical State View")
 
 st.markdown("---")
 st.caption("Patent Shield v1.1 | Powered by LangGraph & MinerU")

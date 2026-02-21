@@ -5,6 +5,8 @@ import tempfile
 from pathlib import Path
 import torch
 
+from utils.llm_fallback import extract_sections_with_llm, is_ollama_available
+
 try:
     import doclayout_yolo.nn.tasks
 
@@ -51,7 +53,8 @@ class DescriptionReaderSubAgent:
     CLAIMS_HEADER_PATTERN = re.compile(
         r"(?im)"
         r"("
-        r"^\s*claims?\s*$"
+        r"^\s*\d+[\.\)]?\s*claims?\s*$"
+        r"|^\s*claims?\s*$"
         r"|^\s*what\s+is\s+claimed\s*(is)?\s*[:\.]?\s*$"
         r"|^\s*what\s+we\s+claim\s*(is)?\s*[:\.]?\s*$"
         r"|^\s*i\s+claim\s*[:\.]?\s*$"
@@ -63,7 +66,8 @@ class DescriptionReaderSubAgent:
     ABSTRACT_HEADER_PATTERN = re.compile(
         r"(?im)"
         r"("
-        r"^\s*abstract\s*$"
+        r"^\s*\d+[\.\)]?\s*abstract\s*$"
+        r"|^\s*abstract\s*$"
         r"|^\s*abstract\s+of\s+the\s+disclosure\s*[:\.]?\s*$"
         r"|^\s*abstract\s+of\s+the\s+invention\s*[:\.]?\s*$"
         r"|^\s*abstract\s*[:\.]\s*$"
@@ -147,24 +151,38 @@ class DescriptionReaderSubAgent:
             with any trailing abstract stripped out)
             → claims_text.txt
 
-        Returns the clean description text.
+        Returns: (description_text, abstract_text)
         """
         claims_match = self.CLAIMS_HEADER_PATTERN.search(full_text)
 
         if not claims_match:
-            # No claims section found — try to extract abstract anyway
+            print(
+                "[DescriptionReaderSubAgent] No claims section detected via regex. Trying LLM fallback..."
+            )
             description_text, abstract_text = self._extract_abstract(full_text.strip())
+
+            if not abstract_text and is_ollama_available():
+                llm_desc, llm_claims, llm_abstract = extract_sections_with_llm(
+                    full_text
+                )
+                if llm_claims:
+                    self._save_text("claims_text.txt", llm_claims)
+                    print(
+                        f"[DescriptionReaderSubAgent] LLM extracted claims ({len(llm_claims)} chars)"
+                    )
+                if llm_abstract:
+                    abstract_text = llm_abstract
+                    print(
+                        f"[DescriptionReaderSubAgent] LLM extracted abstract ({len(llm_abstract)} chars)"
+                    )
+                if llm_desc:
+                    description_text = llm_desc
+
             self._save_text("describtion_text.txt", description_text)
             if abstract_text:
                 self._save_text("abstract_text.txt", abstract_text)
                 print(
-                    "[DescriptionReaderSubAgent] Warning: No claims section detected. "
-                    "Full text saved as description. abstract_text.txt created."
-                )
-            else:
-                print(
-                    "[DescriptionReaderSubAgent] Warning: No claims section detected. "
-                    "Full text saved as description."
+                    "[DescriptionReaderSubAgent] abstract_text.txt created via fallback."
                 )
             return description_text, abstract_text
 
@@ -187,6 +205,18 @@ class DescriptionReaderSubAgent:
 
         # Use abstract from claims if found, otherwise from description
         abstract_text = abstract_from_claims or abstract_from_desc
+
+        # --- LLM fallback if no abstract found ---
+        if not abstract_text and is_ollama_available():
+            print(
+                "[DescriptionReaderSubAgent] No abstract via regex. Trying LLM fallback..."
+            )
+            _, _, llm_abstract = extract_sections_with_llm(full_text)
+            if llm_abstract:
+                abstract_text = llm_abstract
+                print(
+                    f"[DescriptionReaderSubAgent] LLM extracted abstract ({len(llm_abstract)} chars)"
+                )
 
         # --- Save all files ---
         self._save_text("describtion_text.txt", description_text)
