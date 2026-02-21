@@ -4,6 +4,7 @@ Connects all agents in a multi-agent workflow for comprehensive patent examinati
 """
 
 from typing import Dict, Any, List, Optional
+import os
 from langgraph.graph import StateGraph, END
 from loguru import logger
 
@@ -51,7 +52,17 @@ def create_patent_workflow():
         if path:
             text, _ = claims_reader.run(path)
         else:
-            text = "Not provided."
+            # Check if claims_text.txt was already populated by description_reader
+            claims_file = "claims_text.txt"
+            if os.path.exists(claims_file):
+                with open(claims_file, "r", encoding="utf-8") as f:
+                    text = f.read()
+                if text.strip():
+                    logger.info(f"Loaded claims from {claims_file}")
+                else:
+                    text = "Not provided."
+            else:
+                text = "Not provided."
         return {"claims_text": text, "current_agent": "drawing_reader"}
 
     def run_drawing(state):
@@ -63,7 +74,17 @@ def create_patent_workflow():
         if path:
             text, _ = drawing_reader.run(path)
         else:
-            text = "Not provided."
+            # Check if drawings_text.txt was already populated
+            drawings_file = "drawings_text.txt"
+            if os.path.exists(drawings_file):
+                with open(drawings_file, "r", encoding="utf-8") as f:
+                    text = f.read()
+                if text.strip():
+                    logger.info(f"Loaded drawings from {drawings_file}")
+                else:
+                    text = "Not provided."
+            else:
+                text = "Not provided."
         return {"drawings_text": text, "current_agent": "END"}
 
     workflow.add_node("description_reader", run_description)
